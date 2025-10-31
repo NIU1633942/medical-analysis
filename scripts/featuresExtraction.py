@@ -68,7 +68,7 @@ for image in image_Names[0:10]:
 
     ### -----PREPROCESSING-----
     #image_Data = ShiftValues(image_Data, value=1024)
-    #image_Data = SetRange(image_Data, in_min=0, in_max=4000)
+    image_Data = SetRange(image_Data, in_min=0, in_max=4000)
     #image = SetGrayLevel(image, levels=24)
 
     diagnosis = df_meta_data[(df_meta_data.patient_id.astype(str)==patient_id)  & 
