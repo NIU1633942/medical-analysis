@@ -19,7 +19,7 @@ import pandas as pd
 from skimage.filters import threshold_otsu
 from scipy.ndimage import gaussian_filter, median_filter
 from skimage import morphology as morph
-from PyCode_Visualization.NiftyIO import readNifty, saveNifty
+from NiftyIO import readNifty, saveNifty
 
 # ------------------------------------
 # PARAMETERS
