@@ -1,13 +1,10 @@
 """
-This is the source code for volume visualization
+This extract the features from the whole volume with pyradiomic
 
-Computer Vision Center
-Universitat Autonoma de Barcelona
-
-__author__ = "Debora Gil, Guillermo Torres, Carles Sanchez, Pau Cano"
-__license__ = "GPL"
-__email__ = "debora,gtorres,csanchez,pcano@cvc.uab.es"
-__year__ = "2023"
+__author__ = "Lariza Sandoval"
+__license__ = ""
+__email__ = ""
+__year__ = "2025"
 """
 
 import os
@@ -37,7 +34,7 @@ image_Names= os.listdir(IMAGE_DIR)
 mask_Names= os.listdir(MASK_DIR)
 mask_Names_Dict = {elemento.replace('best_mask_',''): elemento.replace('best_mask_','') for elemento in mask_Names}
 
-#Reading meta Excel
+#Reading meta data Excel
 df_meta_data = pd.read_excel( os.path.join(DATA_INPUT_ROOT,'MetadatabyNoduleMaxVoting.xlsx'), 
                       sheet_name='ML4PM_MetadatabyNoduleMaxVoting', 
                       engine='openpyxl'
@@ -53,6 +50,7 @@ params = os.path.join(DATA_INPUT_ROOT,'FeaturesExtraction_Params.yaml')
 extractor = featureextractor.RadiomicsFeatureExtractor(params)
 nodules_features = []
 
+#Extracting features from all whole images
 for image in image_Names[0:10]:
         
     image_Name= os.path.join(IMAGE_DIR,image)
