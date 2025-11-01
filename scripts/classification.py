@@ -18,17 +18,20 @@ from sklearn.calibration import CalibratedClassifierCV
 import joblib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RESULTS_CSV = os.path.join(BASE_DIR, "..", "results", "results.csv")
-FEATURES_CSV = os.path.join(BASE_DIR, "..", "data", "input", "features.xlsx")
+RESULTS_CSV = os.path.join(BASE_DIR, "..", "results", "results_classification.csv")
+#FEATURES_CSV = os.path.join(BASE_DIR, "..", "data", "input", "features.csv")
+FEATURES_XLSX = os.path.join(BASE_DIR, "..", "data", "input", "features.xlsx")
+
 MODELS_DIR = os.path.join(BASE_DIR, "..", "data", "output", "models")
 
 #load values 
 # X (n_samples, n_features), Y (n_samples, )
-df = pd.read_csv(FEATURES_CSV)
+#df = pd.read_csv(FEATURES_CSV) #csv
+df = pd.read_excel(FEATURES_XLSX, sheet_name='Sheet1') #excel
 feature_cols = [c for c in df.columns if c.startswith('original_glcm_')]
 
 X = df[feature_cols].values
-Y = np.array([1 if d == "Malignant" else 0 for d in df['diagnosis']])
+Y = np.array([d for d in df['diagnosis']])
 groups = df['nodule_id'].values
 
 # Split data into training and testing sets
@@ -70,11 +73,12 @@ for name, clf in models.items():
     print("Confusion Matrix:\n", metrics.confusion_matrix(y_test, y_pred))
     print(f"AUC: {auc:.3f}")
 
-    joblib.dump(calibrated, f"{name}_model.joblib")
+    model_path = os.path.join(MODELS_DIR, f"{name}_model.joblib")
+    joblib.dump(calibrated, model_path)
 
 df = pd.DataFrame(results, columns=["Model", "Accuracy", "Precision", "Recall", "F1", "AUC"])
 print("\n=== Summary of Models ===")
 print(df.sort_values(by="AUC", ascending=False))
 os.makedirs(os.path.dirname(RESULTS_CSV), exist_ok=True)
 df.to_csv(RESULTS_CSV, index=False)
-print("Pipeline finished. All opening/closing combinations tested.")
+print("Pipeline finished. Models trained and evaluated.")

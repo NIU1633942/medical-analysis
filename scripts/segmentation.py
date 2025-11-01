@@ -31,7 +31,7 @@ RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
 IMAGE_DIR = os.path.join(DATA_INPUT_ROOT, "image")
 MASK_DIR  = os.path.join(DATA_INPUT_ROOT, "nodule_mask")
 
-RESULTS_CSV = os.path.join(RESULTS_DIR, "results.csv")
+RESULTS_CSV = os.path.join(RESULTS_DIR, "results_segmentation.csv")
 
 GAUSSIAN_SIGMAS = [0, 0.5, 1, 2, 4]   # 0 = no Gaussian
 MEDIAN_SIZES = [1, 3, 5]              # 1 = no Median
