@@ -31,20 +31,22 @@ RESULTS_DIR = os.path.join(BASE_DIR, "..", "results")
 IMAGE_DIR = os.path.join(DATA_INPUT_ROOT, "image")
 MASK_DIR  = os.path.join(DATA_INPUT_ROOT, "nodule_mask")
 
-RESULTS_CSV = os.path.join(RESULTS_DIR, "results.csv")
+RESULTS_CSV = os.path.join(RESULTS_DIR, "results_segmentation.csv")
 
-GAUSSIAN_SIGMAS = [0, 0.5, 1, 2, 3, 4]  # 0 = no Gaussian
-MEDIAN_SIZES    = [1, 3, 5]             # 1 = no Median
+GAUSSIAN_SIGMAS = [0, 0.5, 1, 2, 4]   # 0 = no Gaussian
+MEDIAN_SIZES = [1, 3, 5]              # 1 = no Median
 
 THRESHOLDS = [
     ("otsu", None),
-    ("fixed", -500),
-    ("fixed", -400),
-    ("fixed", -300)
+    ("fixed", -700),
+    ("fixed", -300),
+    ("fixed", 0),
+    ("fixed", 300)
 ]
 
-OPENING_SIZES = [0, 2, 3]  # 0 = no opening
-CLOSING_SIZES = [0, 2, 3]  # 0 = no closing
+OPENING_SIZES = [0, 2, 4]    # 0 = no opening
+CLOSING_SIZES = [0, 2, 4]    # 0 = no closing
+
 
 
 def dice_coef(a, b):
@@ -135,7 +137,7 @@ def main():
         best_idx = np.argmax(all_dice)
         best_mask, metadata = masks_results[best_idx]
 
-        output_path = os.path.join(DATA_OUTPUT_ROOT, f"best_mask_{img_name}")
+        output_path = os.path.join(DATA_OUTPUT_ROOT, "masks", f"best_mask_{img_name}")
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         saveNifty(best_mask.astype(np.uint8), metadata, output_path)
     
