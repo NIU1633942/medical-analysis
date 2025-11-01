@@ -137,7 +137,7 @@ def main():
         best_idx = np.argmax(all_dice)
         best_mask, metadata = masks_results[best_idx]
 
-        output_path = os.path.join(DATA_OUTPUT_ROOT, f"best_mask_{img_name}")
+        output_path = os.path.join(DATA_OUTPUT_ROOT, "masks", f"best_mask_{img_name}")
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         saveNifty(best_mask.astype(np.uint8), metadata, output_path)
     
