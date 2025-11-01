@@ -33,18 +33,20 @@ MASK_DIR  = os.path.join(DATA_INPUT_ROOT, "nodule_mask")
 
 RESULTS_CSV = os.path.join(RESULTS_DIR, "results.csv")
 
-GAUSSIAN_SIGMAS = [0, 0.5, 1, 2, 3, 4]  # 0 = no Gaussian
-MEDIAN_SIZES    = [1, 3, 5]             # 1 = no Median
+GAUSSIAN_SIGMAS = [0, 0.5, 1, 2, 4]   # 0 = no Gaussian
+MEDIAN_SIZES = [1, 3, 5]              # 1 = no Median
 
 THRESHOLDS = [
     ("otsu", None),
-    ("fixed", -500),
-    ("fixed", -400),
-    ("fixed", -300)
+    ("fixed", -700),
+    ("fixed", -300),
+    ("fixed", 0),
+    ("fixed", 300)
 ]
 
-OPENING_SIZES = [0, 2, 3]  # 0 = no opening
-CLOSING_SIZES = [0, 2, 3]  # 0 = no closing
+OPENING_SIZES = [0, 2, 4]    # 0 = no opening
+CLOSING_SIZES = [0, 2, 4]    # 0 = no closing
+
 
 
 def dice_coef(a, b):
