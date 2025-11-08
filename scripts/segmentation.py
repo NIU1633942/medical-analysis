@@ -47,8 +47,6 @@ THRESHOLDS = [
 OPENING_SIZES = [0, 2, 4]    # 0 = no opening
 CLOSING_SIZES = [0, 2, 4]    # 0 = no closing
 
-
-
 def dice_coef(a, b):
     a = a > 0
     b = b > 0
@@ -86,8 +84,9 @@ def segment_pipeline(img, sigma, med_size, thr_method, thr_value, open_size, clo
 def main():
     all_results = []
     masks_results = []
-    test_img = ["LIDC-IDRI-0001_R_1.nii.gz", "LIDC-IDRI-0003_R_2.nii.gz", "LIDC-IDRI-0003_R_3.nii.gz", "LIDC-IDRI-0003_R_4.nii.gz", "LIDC-IDRI-0004_R_1.nii.gz"]
-    
+    #test_img = ["LIDC-IDRI-0001_R_1.nii.gz", "LIDC-IDRI-0003_R_2.nii.gz", "LIDC-IDRI-0003_R_3.nii.gz", "LIDC-IDRI-0003_R_4.nii.gz", "LIDC-IDRI-0004_R_1.nii.gz"]
+    test_img = [img_name for img_name in os.listdir(IMAGE_DIR) if img_name.endswith(".nii") and not img_name.endswith(".nii.gz")]
+    test_img = test_img[0:100]
     #for img_name in os.listdir(IMAGE_DIR):
     #    if not img_name.endswith(".nii") and not img_name.endswith(".nii.gz"):
     #        continue
