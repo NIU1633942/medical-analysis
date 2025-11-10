@@ -13,7 +13,7 @@ def SetRange(image, in_min, in_max):
     
     image[image<0] = 0
     image[image>image.max()] = image.max()
-    print("Range after SetRange: {:.2f} - {:.2f}".format(image.min(), image.max()))
+    #print("Range after SetRange: {:.2f} - {:.2f}".format(image.min(), image.max()))
     return image
     
 

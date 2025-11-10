@@ -51,7 +51,7 @@ extractor = featureextractor.RadiomicsFeatureExtractor(params)
 nodules_features = []
 
 #Extracting features from all whole images
-for image in image_Names[0:10]:
+for image in image_Names:
         
     image_Name= os.path.join(IMAGE_DIR,image)
     mask_Name=os.path.join(MASK_DIR,mask_Names_Dict[image])

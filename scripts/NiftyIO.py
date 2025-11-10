@@ -55,8 +55,8 @@ def readNifty(filePath,CoordinateOrder='xyz'):
  # vol,_=readNifty(filePath)
     """
     image = sitk.ReadImage(filePath)
-    print("Reading Nifty format from {}".format(filePath))
-    print("Image size: {}".format(image.GetSize()))
+    #print("Reading Nifty format from {}".format(filePath))
+    #print("Image size: {}".format(image.GetSize()))
 
     metadata = Metadata(image.GetOrigin(), image.GetSpacing(), image.GetDirection())
 
@@ -68,9 +68,9 @@ def readNifty(filePath,CoordinateOrder='xyz'):
     else:
         volume_xyz=volume_zyx
 
-    print("Volume shape: {}".format(volume_xyz.shape))
-    print("Minimum value: {}".format(np.min(volume_xyz)))
-    print("Maximum value: {}".format(np.max(volume_xyz)))
+    #print("Volume shape: {}".format(volume_xyz.shape))
+    #print("Minimum value: {}".format(np.min(volume_xyz)))
+    #print("Maximum value: {}".format(np.max(volume_xyz)))
 
     return volume_xyz, metadata     # return two items.
 
