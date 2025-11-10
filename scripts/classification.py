@@ -29,6 +29,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "data", "output", "models")
 #load values 
 # X (n_samples, n_features), Y (n_samples, )
 df = pd.read_csv(FEATURES_CSV) #csv
+df = df.head(50)
 #df = pd.read_excel(FEATURES_XLSX, sheet_name='Sheet1') #excel
 feature_cols = [c for c in df.columns if c.startswith('original_glcm_')]
 
@@ -54,9 +55,9 @@ models = {
 }
 
 params_SVM = {
-    'kernel' : ['linear', 'poly', 'rbf', 'sigmoid'],
+    'kernel' : ['linear', 'poly', 'rbf'],
     'C' : [0.1, 1, 10, 100],
-    'gamma' : ['scale', 'auto', 0.01, 0.1, 1],
+    'gamma' : ['scale', 'auto', 0.01, 0.1],
 }
 params_KNN = {
     'n_neighbors': [3, 5, 7],
@@ -64,22 +65,22 @@ params_KNN = {
     'metric': ['euclidean', 'manhattan', 'minkowski']
 }
 params_LogReg = {
-    'C': [0.01, 0.1, 1, 10, 100],
+    'C': [0.01, 0.1, 1, 10],
     'penalty': ['l2', None],
     'solver': ['lbfgs', 'saga'],
-    'max_iter': [500, 1000, 2000],
+    'max_iter': [500, 1000],
 }
 params_MLP = {
-    'hidden_layer_sizes': [(50,), (100,), (100, 50), (100, 100)],
+    'hidden_layer_sizes': [(50,), (100,), (100, 50)],
     'activation': ['relu', 'tanh', 'logistic'],
     'solver': ['adam', 'sgd'],
-    'alpha': [0.0001, 0.001, 0.01],
+    'alpha': [0.0001, 0.01],
     'learning_rate': ['constant', 'adaptive'],
-    'max_iter': [500, 1000, 2000],
+    'max_iter': [500, 1000],
 }
 params_RF = {
     'n_estimators': [100, 200, 500],
-    'max_depth': [None, 10, 20, 30],
+    'max_depth': [None, 10, 20],
     'min_samples_split': [2, 5, 10],
     'min_samples_leaf': [1, 2, 4],
     'bootstrap': [True, False],
@@ -146,40 +147,49 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
             "Precision": metrics.precision_score(y_test, y_pred),
             "Recall": metrics.recall_score(y_test, y_pred),
             "F1": metrics.f1_score(y_test, y_pred),
-            "AUC": metrics.roc_auc_score(y_test, y_prob)
+            "AUC": metrics.roc_auc_score(y_test, y_prob),
+            "CM" : metrics.confusion_matrix(y_test, y_pred).flatten().tolist()
         })
     elif method in ["kfold", "stratified_kfold"]:
         for k in k_values:
+            print(f"Kfolds = {k}")
             if method == "stratified_kfold":
                 kf = StratifiedKFold(n_splits=k, shuffle=True, random_state=random_state)
             else:
                 kf = KFold(n_splits=k, shuffle=True, random_state=random_state)
+            
+            all_y_true = []
+            all_y_pred = []
+            
+            acc, prec, rec, f1s, aucs = [], [], [], [], []
+            for train_idx, test_idx in kf.split(X, Y if method=="stratified_kfold" else None):
+                clf.fit(X[train_idx], Y[train_idx])
+                calibrated = CalibratedClassifierCV(clf, cv='prefit')
+                calibrated.fit(X[train_idx], Y[train_idx])
 
-        acc, prec, rec, f1s, aucs = [], [], [], [], []
-        for train_idx, test_idx in kf.split(X, Y if method=="stratified_kfold" else None):
-            clf.fit(X[train_idx], Y[train_idx])
-            calibrated = CalibratedClassifierCV(clf, cv='prefit')
-            calibrated.fit(X[train_idx], Y[train_idx])
+                y_pred = calibrated.predict(X[test_idx])
+                y_prob = calibrated.predict_proba(X[test_idx])[:, 1]
 
-            y_pred = calibrated.predict(X[test_idx])
-            y_prob = calibrated.predict_proba(X[test_idx])[:, 1]
+                all_y_true.extend(Y[test_idx])
+                all_y_pred.extend(y_pred)
 
-            acc.append(metrics.accuracy_score(Y[test_idx], y_pred))
-            prec.append(metrics.precision_score(Y[test_idx], y_pred))
-            rec.append(metrics.recall_score(Y[test_idx], y_pred))
-            f1s.append(metrics.f1_score(Y[test_idx], y_pred))
-            aucs.append(metrics.roc_auc_score(Y[test_idx], y_prob))
+                acc.append(metrics.accuracy_score(Y[test_idx], y_pred))
+                prec.append(metrics.precision_score(Y[test_idx], y_pred))
+                rec.append(metrics.recall_score(Y[test_idx], y_pred))
+                f1s.append(metrics.f1_score(Y[test_idx], y_pred))
+                aucs.append(metrics.roc_auc_score(Y[test_idx], y_prob))
 
-        results.append({
-            "Method": method,
-            "K": k,
-            "Accuracy": np.mean(acc),
-            "Accuracy_std": np.std(acc),
-            "Precision": np.mean(prec),
-            "Recall": np.mean(rec),
-            "F1": np.mean(f1s),
-            "AUC": np.mean(aucs)
-            })
+            results.append({
+                "Method": method,
+                "K": k,
+                "Accuracy": np.mean(acc),
+                "Accuracy_std": np.std(acc),
+                "Precision": np.mean(prec),
+                "Recall": np.mean(rec),
+                "F1": np.mean(f1s),
+                "AUC": np.mean(aucs),
+                "CM": metrics.confusion_matrix(all_y_true, all_y_pred).flatten().tolist()
+                })
     return results
 
 
@@ -190,7 +200,7 @@ all_model_instances = generate_model_instances(models, param_grids)
 print(f"Total model combinations to evaluate: {len(all_model_instances)}")
 class_counts = Counter(Y)
 min_samples = min(class_counts.values())
-k_values = [3, 5, 7, 10]
+k_values = [3, 5, 7]
 k_values_safe = [k for k in k_values if k <= min_samples]
 
 results = []
@@ -210,7 +220,7 @@ for model_info in all_model_instances:
 
     # K-Fold
     print(f"\nMethod = kfold")
-    r_kf = evaluate_model(X, Y, clf, method="kfold", k_values=k_values)
+    r_kf = evaluate_model(X, Y, clf, method="kfold", k_values=k_values_safe)
     for r in r_kf:
         r.update({"Model": name, "Params": params})
         results.append(r)
@@ -221,6 +231,10 @@ for model_info in all_model_instances:
     for r in r_skf:
         r.update({"Model": name, "Params": params})
         results.append(r)
+
+    #model_filename = generate_model_filename(params)
+    #model_path = os.path.join(MODELS_DIR, model_filename)
+    #joblib.dump(calibrated, model_path)
 
 # Guardar resultados
 df_results = pd.DataFrame(results)
