@@ -89,6 +89,14 @@ params_RF = {
     'bootstrap': [False]
 }
 
+param_grids = {
+    "SVM": params_SVM,
+    "KNN": params_KNN,
+    "LogReg": params_LogReg,
+    "MLP": params_MLP,
+    "RF": params_RF
+}
+
 def generate_model_instances(models, param_grids):
     model_instances = []
 
