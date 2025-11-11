@@ -29,7 +29,6 @@ MODELS_DIR = os.path.join(BASE_DIR, "..", "data", "output", "models")
 #load values 
 # X (n_samples, n_features), Y (n_samples, )
 df = pd.read_csv(FEATURES_CSV) #csv
-df = df.head(50)
 #df = pd.read_excel(FEATURES_XLSX, sheet_name='Sheet1') #excel
 feature_cols = [c for c in df.columns if c.startswith('original_glcm_')]
 
@@ -55,47 +54,39 @@ models = {
 }
 
 params_SVM = {
-    'kernel': ['poly', 'sigmoid'],    # already tested ['linear', 'rbf']
-    'C': [5, 50, 100],                # already tested [0.1, 1, 10]
-    'gamma': ['auto', 0.01, 1.0]      # already tested ['scale', 0.1]
+    'kernel': ['linear'],
+    'C': [5],
+    'gamma': ['auto']
 }
 
 params_KNN = {
-    'n_neighbors': [7, 9, 11],        # already tested [3, 5]
-    'weights': ['uniform'],           # already tested ['uniform', 'distance']
-    'metric': ['minkowski', 'chebyshev']  # already tested ['euclidean', 'manhattan']
+    'n_neighbors': [9],
+    'weights': ['uniform'],
+    'metric': ['minkowski']
 }
 
 params_LogReg = {
-    'C': [5, 10, 50],                 # already tested [0.01, 0.1, 1]
-    'penalty': ['l1', 'elasticnet'],  # already tested ['l2']
-    'solver': ['saga'],               # already tested ['lbfgs']
-    'max_iter': [1000],               # already tested [500]
+    'C': [10],
+    'penalty': ['l1'],
+    'solver': ['saga'],
+    'max_iter': [1000]
 }
 
 params_MLP = {
-    'hidden_layer_sizes': [(150,), (200,), (100, 100)],  # already tested [(100,), (100, 50)]
-    'activation': ['logistic'],        # already tested ['relu', 'tanh']
-    'solver': ['sgd'],                 # already tested ['adam']
-    'alpha': [0.001, 0.01],            # already tested [0.0001]
-    'learning_rate': ['adaptive'],     # already tested ['constant']
-    'max_iter': [1000],                # already tested [500]
+    'hidden_layer_sizes': [(150,)],
+    'activation': ['logistic'],
+    'solver': ['sgd'],
+    'alpha': [0.001],
+    'learning_rate': ['adaptive'],
+    'max_iter': [1000]
 }
 
 params_RF = {
-    'n_estimators': [300, 500, 800],   # already tested [100, 200]
-    'max_depth': [10, 30, None],       # already tested [None, 20]
-    'min_samples_split': [3, 8],       # already tested [2, 5]
-    'min_samples_leaf': [3, 5],        # already tested [1, 2]
-    'bootstrap': [False],              # already tested [True]
-}
-
-param_grids = {
-    "SVM": params_SVM,
-    "KNN": params_KNN,
-    "LogReg": params_LogReg,
-    "MLP": params_MLP,
-    "RF": params_RF
+    'n_estimators': [500],
+    'max_depth': [30],
+    'min_samples_split': [3],
+    'min_samples_leaf': [3],
+    'bootstrap': [False]
 }
 
 def generate_model_instances(models, param_grids):
