@@ -55,35 +55,35 @@ models = {
 }
 
 params_SVM = {
-    'kernel' : ['linear', 'poly', 'rbf'],
-    'C' : [0.1, 1, 10, 100],
-    'gamma' : ['scale', 'auto', 0.01, 0.1],
+    'kernel': ['linear', 'rbf'],
+    'C': [0.1, 1, 10],
+    'gamma': ['scale', 0.1]
 }
 params_KNN = {
-    'n_neighbors': [3, 5, 7],
+    'n_neighbors': [3, 5],
     'weights': ['uniform', 'distance'],
-    'metric': ['euclidean', 'manhattan', 'minkowski']
+    'metric': ['euclidean', 'manhattan']
 }
 params_LogReg = {
-    'C': [0.01, 0.1, 1, 10],
-    'penalty': ['l2', None],
-    'solver': ['lbfgs', 'saga'],
-    'max_iter': [500, 1000],
+ 'C': [0.01, 0.1, 1],   
+ 'penalty': ['l2'],     
+ 'solver': ['lbfgs'],   
+ 'max_iter': [500],
 }
 params_MLP = {
-    'hidden_layer_sizes': [(50,), (100,), (100, 50)],
-    'activation': ['relu', 'tanh', 'logistic'],
-    'solver': ['adam', 'sgd'],
-    'alpha': [0.0001, 0.01],
-    'learning_rate': ['constant', 'adaptive'],
-    'max_iter': [500, 1000],
+ 'hidden_layer_sizes': [(100,), (100, 50)],
+ 'activation': ['relu', 'tanh'],
+ 'solver': ['adam'],
+ 'alpha': [0.0001],
+ 'learning_rate': ['constant'],
+ 'max_iter': [500],
 }
 params_RF = {
-    'n_estimators': [100, 200, 500],
-    'max_depth': [None, 10, 20],
-    'min_samples_split': [2, 5, 10],
-    'min_samples_leaf': [1, 2, 4],
-    'bootstrap': [True, False],
+ 'n_estimators': [100, 200],
+ 'max_depth': [None, 20],
+ 'min_samples_split': [2, 5],
+ 'min_samples_leaf': [1, 2],
+ 'bootstrap': [True],
 }
 
 param_grids = {
@@ -210,27 +210,35 @@ for model_info in all_model_instances:
     clf = model_info["model_instance"]
     params = model_info["params"]
     print(f"\nTraining model: {name} with params: {params}")
+    model_results = []
 
     # Train/Test Split
     print(f"\nMethod = train_test_split")
     r_tt = evaluate_model(X, Y, clf, method="train_test_split")
     for r in r_tt:
         r.update({"Model": name, "Params": params})
-        results.append(r)
-
+    model_results.extend(r_tt)
+    
     # K-Fold
     print(f"\nMethod = kfold")
     r_kf = evaluate_model(X, Y, clf, method="kfold", k_values=k_values_safe)
     for r in r_kf:
         r.update({"Model": name, "Params": params})
-        results.append(r)
+    model_results.extend(r_kf)
 
     # Stratified K-Fold
     print(f"\nMethod = stratified_kfold")
     r_skf = evaluate_model(X, Y, clf, method="stratified_kfold", k_values=k_values_safe)
     for r in r_skf:
         r.update({"Model": name, "Params": params})
-        results.append(r)
+    model_results.extend(r_skf)
+
+    os.makedirs(os.path.dirname(RESULTS_CSV), exist_ok=True)
+    df_new = pd.DataFrame(model_results)
+    file_exists = os.path.isfile(RESULTS_CSV)
+    df_new.to_csv(RESULTS_CSV, mode='a', index=False, header=not file_exists)
+
+    print(f"Appended results for {name} ({len(df_new)} rows) to {RESULTS_CSV}")
 
     #model_filename = generate_model_filename(params)
     #model_path = os.path.join(MODELS_DIR, model_filename)
