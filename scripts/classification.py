@@ -55,9 +55,9 @@ models = {
 }
 
 params_SVM = {
-    'kernel': ['linear', 'rbf'],
-    'C': [0.1, 1, 10],
-    'gamma': ['scale', 0.1]
+    'kernel': ['linear', 'rbf'],   #already tested ['linear', 'rbf']
+    'C': [0.1, 1, 10],             #already tested [0.1, 1, 10]
+    'gamma': ['scale', 0.1]        #already tested ['scale', 0.1]
 }
 params_KNN = {
     'n_neighbors': [3, 5],
@@ -244,12 +244,7 @@ for model_info in all_model_instances:
     #model_path = os.path.join(MODELS_DIR, model_filename)
     #joblib.dump(calibrated, model_path)
 
-# Guardar resultados
-df_results = pd.DataFrame(results)
-print("\n=== Summary of Models ===")
-print(df_results.sort_values(by="AUC", ascending=False))
-os.makedirs(os.path.dirname(RESULTS_CSV), exist_ok=True)
-df_results.to_csv(RESULTS_CSV, index=False)
+
 print("Pipeline finished. Models trained and evaluated.")
 
 """
