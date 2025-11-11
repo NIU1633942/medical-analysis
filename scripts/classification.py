@@ -55,35 +55,39 @@ models = {
 }
 
 params_SVM = {
-    'kernel': ['linear', 'rbf'],   #already tested ['linear', 'rbf']
-    'C': [0.1, 1, 10],             #already tested [0.1, 1, 10]
-    'gamma': ['scale', 0.1]        #already tested ['scale', 0.1]
+    'kernel': ['poly', 'sigmoid'],    # already tested ['linear', 'rbf']
+    'C': [5, 50, 100],                # already tested [0.1, 1, 10]
+    'gamma': ['auto', 0.01, 1.0]      # already tested ['scale', 0.1]
 }
+
 params_KNN = {
-    'n_neighbors': [3, 5],
-    'weights': ['uniform', 'distance'],
-    'metric': ['euclidean', 'manhattan']
+    'n_neighbors': [7, 9, 11],        # already tested [3, 5]
+    'weights': ['uniform'],           # already tested ['uniform', 'distance']
+    'metric': ['minkowski', 'chebyshev']  # already tested ['euclidean', 'manhattan']
 }
+
 params_LogReg = {
- 'C': [0.01, 0.1, 1],   
- 'penalty': ['l2'],     
- 'solver': ['lbfgs'],   
- 'max_iter': [500],
+    'C': [5, 10, 50],                 # already tested [0.01, 0.1, 1]
+    'penalty': ['l1', 'elasticnet'],  # already tested ['l2']
+    'solver': ['saga'],               # already tested ['lbfgs']
+    'max_iter': [1000],               # already tested [500]
 }
+
 params_MLP = {
- 'hidden_layer_sizes': [(100,), (100, 50)],
- 'activation': ['relu', 'tanh'],
- 'solver': ['adam'],
- 'alpha': [0.0001],
- 'learning_rate': ['constant'],
- 'max_iter': [500],
+    'hidden_layer_sizes': [(150,), (200,), (100, 100)],  # already tested [(100,), (100, 50)]
+    'activation': ['logistic'],        # already tested ['relu', 'tanh']
+    'solver': ['sgd'],                 # already tested ['adam']
+    'alpha': [0.001, 0.01],            # already tested [0.0001]
+    'learning_rate': ['adaptive'],     # already tested ['constant']
+    'max_iter': [1000],                # already tested [500]
 }
+
 params_RF = {
- 'n_estimators': [100, 200],
- 'max_depth': [None, 20],
- 'min_samples_split': [2, 5],
- 'min_samples_leaf': [1, 2],
- 'bootstrap': [True],
+    'n_estimators': [300, 500, 800],   # already tested [100, 200]
+    'max_depth': [10, 30, None],       # already tested [None, 20]
+    'min_samples_split': [3, 8],       # already tested [2, 5]
+    'min_samples_leaf': [3, 5],        # already tested [1, 2]
+    'bootstrap': [False],              # already tested [True]
 }
 
 param_grids = {
