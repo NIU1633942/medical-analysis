@@ -19,6 +19,9 @@ from sklearn.metrics import (
 from sklearn.calibration import CalibratedClassifierCV
 import joblib
 
+import ctypes
+ctypes.windll.kernel32.SetThreadExecutionState(0x80000002)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_CSV = os.path.join(BASE_DIR, "..", "results", "results_classification.csv")
 FEATURES_CSV = os.path.join(BASE_DIR, "..", "results", "features.csv")
@@ -249,6 +252,8 @@ for model_info in all_model_instances:
 
 
 print("Pipeline finished. Models trained and evaluated.")
+ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
+os.system("shutdown /s /t 60")
 
 """
 # Train and evaluate model performance 
