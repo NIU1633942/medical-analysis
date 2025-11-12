@@ -57,39 +57,40 @@ models = {
 }
 
 params_SVM = {
-    'kernel': ['rbf'],        # try nonlinear kernel instead of linear
-    'C': [1.0],               # lower regularization strength
-    'gamma': ['scale']        # adaptive gamma based on features
+    'kernel': ['sigmoid'],    # kernel alternativo, útil en datasets con separación no lineal suave
+    'C': [2.5],               # regularización media
+    'gamma': ['scale']        # valor automático adaptado a los features
 }
 
 params_KNN = {
-    'n_neighbors': [5],       # smaller neighborhood for higher sensitivity
-    'weights': ['distance'],  # closer points get more weight
-    'metric': ['euclidean']   # standard L2 distance
+    'n_neighbors': [9],       # mayor vecindario → más suavizado
+    'weights': ['uniform'],   # todos los vecinos pesan igual
+    'metric': ['manhattan']   # distancia L1, más robusta a outliers
 }
 
 params_LogReg = {
-    'C': [0.5],               # stronger regularization
-    'penalty': ['l2'],        # ridge penalty
-    'solver': ['lbfgs'],      # robust solver for l2
-    'max_iter': [2000]
+    'C': [2.0],               # regularización más débil (más flexible)
+    'penalty': ['elasticnet'],# mezcla L1 + L2 (requiere saga)
+    'solver': ['saga'],
+    'max_iter': [3000],
+    'l1_ratio': [0.3]         # 30% L1, 70% L2
 }
 
 params_MLP = {
-    'hidden_layer_sizes': [(100, 50)],  # two layers, more expressive
-    'activation': ['relu'],             # modern nonlinearity
-    'solver': ['adam'],                 # adaptive optimizer
-    'alpha': [0.0001],                  # smaller regularization
-    'learning_rate': ['constant'],      # fixed learning rate
-    'max_iter': [2000]
+    'hidden_layer_sizes': [(150, 75, 30)],  # red más profunda
+    'activation': ['tanh'],                 # alternativa más suave a ReLU
+    'solver': ['adam'],
+    'alpha': [0.001],                       # regularización algo mayor
+    'learning_rate': ['adaptive'],          # adapta tasa según error
+    'max_iter': [2500]
 }
 
 params_RF = {
-    'n_estimators': [300],     # fewer trees (faster)
-    'max_depth': [20],         # slightly shallower trees
-    'min_samples_split': [2],
-    'min_samples_leaf': [1],
-    'bootstrap': [True]        # enable bagging
+    'n_estimators': [600],     # más árboles → más estabilidad
+    'max_depth': [25],
+    'min_samples_split': [3],
+    'min_samples_leaf': [2],
+    'bootstrap': [False]       # sin reemplazo — más diversidad entre árboles
 }
 
 param_grids = {
@@ -254,7 +255,7 @@ for model_info in all_model_instances:
 
 print("Pipeline finished. Models trained and evaluated.")
 ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
-os.system("shutdown /s /t 60")
+#os.system("shutdown /s /t 60")
 
 """
 # Train and evaluate model performance 
