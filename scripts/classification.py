@@ -57,39 +57,39 @@ models = {
 }
 
 params_SVM = {
-    'kernel': ['linear'],
-    'C': [5],
-    'gamma': ['auto']
+    'kernel': ['rbf'],        # try nonlinear kernel instead of linear
+    'C': [1.0],               # lower regularization strength
+    'gamma': ['scale']        # adaptive gamma based on features
 }
 
 params_KNN = {
-    'n_neighbors': [9],
-    'weights': ['uniform'],
-    'metric': ['minkowski']
+    'n_neighbors': [5],       # smaller neighborhood for higher sensitivity
+    'weights': ['distance'],  # closer points get more weight
+    'metric': ['euclidean']   # standard L2 distance
 }
 
 params_LogReg = {
-    'C': [10],
-    'penalty': ['l1'],
-    'solver': ['saga'],
-    'max_iter': [1000]
+    'C': [0.5],               # stronger regularization
+    'penalty': ['l2'],        # ridge penalty
+    'solver': ['lbfgs'],      # robust solver for l2
+    'max_iter': [2000]
 }
 
 params_MLP = {
-    'hidden_layer_sizes': [(150,)],
-    'activation': ['logistic'],
-    'solver': ['sgd'],
-    'alpha': [0.001],
-    'learning_rate': ['adaptive'],
-    'max_iter': [1000]
+    'hidden_layer_sizes': [(100, 50)],  # two layers, more expressive
+    'activation': ['relu'],             # modern nonlinearity
+    'solver': ['adam'],                 # adaptive optimizer
+    'alpha': [0.0001],                  # smaller regularization
+    'learning_rate': ['constant'],      # fixed learning rate
+    'max_iter': [2000]
 }
 
 params_RF = {
-    'n_estimators': [500],
-    'max_depth': [30],
-    'min_samples_split': [3],
-    'min_samples_leaf': [3],
-    'bootstrap': [False]
+    'n_estimators': [300],     # fewer trees (faster)
+    'max_depth': [20],         # slightly shallower trees
+    'min_samples_split': [2],
+    'min_samples_leaf': [1],
+    'bootstrap': [True]        # enable bagging
 }
 
 param_grids = {
@@ -204,6 +204,7 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
 
 all_model_instances = generate_model_instances(models, param_grids)
 print(f"Total model combinations to evaluate: {len(all_model_instances)}")
+
 class_counts = Counter(Y)
 min_samples = min(class_counts.values())
 k_values = [3, 5, 7]
