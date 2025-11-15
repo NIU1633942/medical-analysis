@@ -19,9 +19,6 @@ from sklearn.metrics import (
 from sklearn.calibration import CalibratedClassifierCV
 import joblib
 
-import ctypes
-ctypes.windll.kernel32.SetThreadExecutionState(0x80000002)
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_CSV = os.path.join(BASE_DIR, "..", "results", "results_classification.csv")
 FEATURES_CSV = os.path.join(BASE_DIR, "..", "results", "features.csv")
@@ -56,42 +53,40 @@ models = {
     "RF": RandomForestClassifier
 }
 
-params_SVM = {
-    'kernel': ['sigmoid'],    # kernel alternativo, útil en datasets con separación no lineal suave
-    'C': [2.5],               # regularización media
-    'gamma': ['scale']        # valor automático adaptado a los features
-}
+params_SVM = [
+    {'kernel': 'linear', 'C': 5, 'gamma': 'auto'},
+    {'kernel': 'rbf', 'C': 1.0, 'gamma': 'scale'},
+    {'kernel': 'sigmoid', 'C': 2.5, 'gamma': 'scale'}
+]
 
-params_KNN = {
-    'n_neighbors': [9],       # mayor vecindario → más suavizado
-    'weights': ['uniform'],   # todos los vecinos pesan igual
-    'metric': ['manhattan']   # distancia L1, más robusta a outliers
-}
 
-params_LogReg = {
-    'C': [2.0],               # regularización más débil (más flexible)
-    'penalty': ['elasticnet'],# mezcla L1 + L2 (requiere saga)
-    'solver': ['saga'],
-    'max_iter': [3000],
-    'l1_ratio': [0.3]         # 30% L1, 70% L2
-}
+params_KNN = [
+    {'n_neighbors': 9, 'weights': 'uniform', 'metric': 'minkowski'},
+    {'n_neighbors': 5, 'weights': 'distance', 'metric': 'euclidean'},
+    {'n_neighbors': 9, 'weights': 'uniform', 'metric': 'manhattan'}
+]
 
-params_MLP = {
-    'hidden_layer_sizes': [(150, 75, 30)],  # red más profunda
-    'activation': ['tanh'],                 # alternativa más suave a ReLU
-    'solver': ['adam'],
-    'alpha': [0.001],                       # regularización algo mayor
-    'learning_rate': ['adaptive'],          # adapta tasa según error
-    'max_iter': [2500]
-}
 
-params_RF = {
-    'n_estimators': [600],     # más árboles → más estabilidad
-    'max_depth': [25],
-    'min_samples_split': [3],
-    'min_samples_leaf': [2],
-    'bootstrap': [False]       # sin reemplazo — más diversidad entre árboles
-}
+params_LogReg = [
+    {'C': 10, 'penalty': 'l1', 'solver': 'saga', 'max_iter': 1000},
+    {'C': 0.5, 'penalty': 'l2', 'solver': 'lbfgs', 'max_iter': 2000},
+    {'C': 2.0, 'penalty': 'elasticnet', 'solver': 'saga', 'max_iter': 3000, 'l1_ratio': 0.3}
+]
+
+
+params_MLP = [
+    {'hidden_layer_sizes': (150,), 'activation': 'logistic', 'solver': 'sgd', 'alpha': 0.001, 'learning_rate': 'adaptive', 'max_iter': 1000},
+    {'hidden_layer_sizes': (100, 50), 'activation': 'relu', 'solver': 'adam', 'alpha': 0.0001, 'learning_rate': 'constant', 'max_iter': 2000},
+    {'hidden_layer_sizes': (150, 75, 30), 'activation': 'tanh', 'solver': 'adam', 'alpha': 0.001, 'learning_rate': 'adaptive', 'max_iter': 2500}
+]
+
+
+params_RF = [
+    {'n_estimators': 500, 'max_depth': 30, 'min_samples_split': 3, 'min_samples_leaf': 3, 'bootstrap': False},
+    {'n_estimators': 300, 'max_depth': 20, 'min_samples_split': 2, 'min_samples_leaf': 1, 'bootstrap': True},
+    {'n_estimators': 600, 'max_depth': 25, 'min_samples_split': 3, 'min_samples_leaf': 2, 'bootstrap': False}
+]
+
 
 param_grids = {
     "SVM": params_SVM,
@@ -102,23 +97,26 @@ param_grids = {
 }
 
 def generate_model_instances(models, param_grids):
+    """
+    Generates model instances for each model with each parameter set.
+
+    models: dict of model_name -> ModelClass
+    param_grids: dict of model_name -> list of parameter dicts
+    """
     model_instances = []
 
     for model_name, ModelClass in models.items():
-        params = param_grids.get(model_name, {})
-        if params:
-            keys, values = zip(*params.items())
-            for combination in itertools.product(*values):
-                param_dict = dict(zip(keys, combination))
-                # Crear instancia con esos parámetros
+        param_list = param_grids.get(model_name, [])
+
+        if param_list:  # If there are parameter sets
+            for param_dict in param_list:
                 instance = ModelClass(**param_dict)
                 model_instances.append({
                     "model_name": model_name,
                     "model_instance": instance,
                     "params": param_dict
                 })
-        else:
-            # Si no hay parámetros, solo instancia base
+        else:  # No parameters: just instantiate default
             instance = ModelClass()
             model_instances.append({
                 "model_name": model_name,
@@ -127,6 +125,7 @@ def generate_model_instances(models, param_grids):
             })
 
     return model_instances
+
 
 def generate_model_filename(params):
     param_str = "_".join(f"{k}-{v}" for k, v in params.items())
@@ -155,7 +154,9 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
             "Recall": metrics.recall_score(y_test, y_pred),
             "F1": metrics.f1_score(y_test, y_pred),
             "AUC": metrics.roc_auc_score(y_test, y_prob),
-            "CM" : metrics.confusion_matrix(y_test, y_pred).flatten().tolist()
+            "CM" : metrics.confusion_matrix(y_test, y_pred).flatten().tolist(),
+            "all_y_true": y_test,
+            "all_y_prob": y_prob
         })
     elif method in ["kfold", "stratified_kfold"]:
         for k in k_values:
@@ -166,6 +167,7 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
                 kf = KFold(n_splits=k, shuffle=True, random_state=random_state)
             
             all_y_true = []
+            all_y_prob = []
             all_y_pred = []
             
             acc, prec, rec, f1s, aucs = [], [], [], [], []
@@ -178,6 +180,7 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
                 y_prob = calibrated.predict_proba(X[test_idx])[:, 1]
 
                 all_y_true.extend(Y[test_idx])
+                all_y_prob.extend(y_prob)
                 all_y_pred.extend(y_pred)
 
                 acc.append(metrics.accuracy_score(Y[test_idx], y_pred))
@@ -195,12 +198,11 @@ def evaluate_model(X, Y, clf, method="train_test_split", k_values=[5], test_size
                 "Recall": np.mean(rec),
                 "F1": np.mean(f1s),
                 "AUC": np.mean(aucs),
-                "CM": metrics.confusion_matrix(all_y_true, all_y_pred).flatten().tolist()
+                "CM": metrics.confusion_matrix(all_y_true, all_y_pred).flatten().tolist(),
+                "all_y_true": np.array(all_y_true),
+                "all_y_prob": np.array(all_y_prob)
                 })
     return results
-
-
-
 
 
 all_model_instances = generate_model_instances(models, param_grids)
@@ -254,7 +256,6 @@ for model_info in all_model_instances:
 
 
 print("Pipeline finished. Models trained and evaluated.")
-ctypes.windll.kernel32.SetThreadExecutionState(0x80000000)
 #os.system("shutdown /s /t 60")
 
 """

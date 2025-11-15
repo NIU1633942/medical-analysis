@@ -21,7 +21,7 @@ df_segmentation = pd.read_csv(RESULTS_SEGMENTATION_CSV)
 # Assign column names (based on your description)
 df_classification.columns = [
     "Method", "K", "Accuracy", "Precision", "Recall", "F1", "AUC",
-    "CM", "Model", "Params", "Accuracy_std"
+    "CM", "all_y_true", "all_y_prob", "Model", "Params", "Accuracy_std"
 ]
 
 df_classification["K"] = pd.to_numeric(df_classification["K"], errors="coerce")
@@ -31,6 +31,14 @@ df_classification["Precision"] = df_classification["Precision"].astype(float)
 df_classification["Recall"] = df_classification["Recall"].astype(float)
 df_classification["F1"] = df_classification["F1"].astype(float)
 df_classification["AUC"] = df_classification["AUC"].astype(float)
+
+df_classification['all_y_true'] = df_classification['all_y_true'].apply(
+    lambda x: np.fromstring(x.replace("\n", " ").replace("[","").replace("]",""), sep=" ", dtype=int)
+)
+
+df_classification['all_y_prob'] = df_classification['all_y_prob'].apply(
+    lambda x: np.fromstring(x.replace("\n", " ").replace("[","").replace("]",""), sep=" ", dtype=float)
+)
 
 # Convert stringified lists/dicts
 df_classification["CM"] = df_classification["CM"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
@@ -174,40 +182,55 @@ def assign_param_codes(df):
 
 # Plot all metrics per model
 def plot_model_metrics():
+    """
+    For each model, plot all metrics in the same figure per parameter set (ParamCode),
+    using consistent colors for each metric.
+    """
     metrics_cols = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
+    colors = ["skyblue", "orange", "green", "red", "purple"]  # same as before
 
     for model in df_classification["Model"].unique():
         subset = df_classification[df_classification["Model"] == model].copy()
-        param_mapping = assign_param_codes(subset)
-        print(f"Generando gráficos para modelo: {model}")
+        param_mapping = assign_param_codes(subset)  # maps full params to short codes
+        print(f"Generating combined plot for model: {model}")
 
-        for metric in metrics_cols:
-            plt.figure(figsize=(8, 5))
-            sns.barplot(
-                data=subset,
-                x="ParamCode",
-                y=metric,
-                palette="Set2"
-            )
-            plt.title(f"{model} - {metric} por Parámetros", fontsize=14)
-            plt.ylabel(metric)
-            plt.xlabel("Parameter Set (see below)")
-            
-            y_min = max(0, subset[metric].min() - 0.02)
-            y_max = min(1, subset[metric].max() + 0.02)
-            plt.ylim(y_min, y_max)
+        # Melt the DataFrame for seaborn
+        plot_df = subset.melt(
+            id_vars=["ParamCode"], 
+            value_vars=metrics_cols,
+            var_name="Metric",
+            value_name="Value"
+        )
 
-            # Show param legend under the plot
-            legend_text = "\n".join([f"{code}: {full}" for full, code in param_mapping.items()])
-            plt.figtext(0.01, -0.05, legend_text, ha="left", fontsize=8, wrap=True)
+        plt.figure(figsize=(10, 6))
+        sns.barplot(
+            data=plot_df,
+            x="ParamCode",
+            y="Value",
+            hue="Metric",
+            palette=colors
+        )
+        plt.title(f"{model} - All Metrics per Parameter Set", fontsize=14)
+        plt.ylabel("Metric Value")
+        plt.xlabel("Parameter Set (see below)")
 
-            plt.tight_layout()
+        # Adjust y-axis
+        y_min = max(0, plot_df["Value"].min() - 0.02)
+        y_max = min(1, plot_df["Value"].max() + 0.02)
+        plt.ylim(y_min, y_max)
 
-            filename = f"{model}_{metric}.png".replace(" ", "_")
-            file_path = os.path.join(PLOT_DIR, filename)
-            plt.savefig(file_path, dpi=150, bbox_inches="tight")
-            plt.close()
-            print(f"✅ Saved: {file_path}")
+        # Show parameter legend under the plot
+        legend_text = "\n".join([f"{code}: {full}" for full, code in param_mapping.items()])
+        plt.figtext(0.01, -0.05, legend_text, ha="left", fontsize=8, wrap=True)
+
+        plt.tight_layout()
+
+        # Save figure
+        filename = f"{model}_all_metrics.png".replace(" ", "_")
+        file_path = os.path.join(PLOT_DIR, filename)
+        plt.savefig(file_path, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"✅ Saved: {file_path}")
 
 # Plot confusion matrices per model
 def plot_confusion_matrices():
@@ -385,37 +408,46 @@ def plot_metric_distributions():
             plt.close()
             print(f"✅ Saved: {filename}")
 
-def plot_roc_curves(top_n=3):
+def plot_best_roc_curves():
+    """
+    Plots ROC curves for the best parameter set and training method for each model.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Classification results containing columns: Model, Accuracy, all_y_true, all_y_prob, Params, Method
+    plot_dir : str
+        Directory to save the plots
+    """
     sns.set_theme(style="whitegrid", font_scale=1.0)
+
+    plt.figure(figsize=(10, 8))
+
+    # Loop over each model
     for model in df_classification["Model"].unique():
         subset = df_classification[df_classification["Model"] == model].copy()
+        # Select the best parameter set by Accuracy
+        best_row = subset.loc[subset["Accuracy"].idxmax()]
 
-        # Select top N parameter sets by Accuracy
-        top_params = subset.nlargest(top_n, "Accuracy")
-        plt.figure(figsize=(8, 6))
+        y_true = best_row["all_y_true"]
+        y_prob = best_row["all_y_prob"]
 
-        for row in top_params.itertuples():
-            y_true = getattr(row, "all_y_true", None)
-            y_prob = getattr(row, "all_y_prob", None)
+        fpr, tpr, _ = roc_curve(y_true, y_prob)
+        roc_auc = auc(fpr, tpr)
 
-            if y_true is None or y_prob is None:
-                continue  # skip if predictions not stored
+        plt.plot(fpr, tpr, lw=2.5, label=f"{model} ({best_row['Method']}) AUC={roc_auc:.2f}")
 
-            fpr, tpr, _ = roc_curve(y_true, y_prob)
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, label=f"{row.ParamCode} (AUC={roc_auc:.2f})")
+    plt.plot([0, 1], [0, 1], "k--", lw=1)
+    plt.title("ROC Curves of Best Parameter Set per Model")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.legend(loc="lower right")
+    plt.tight_layout()
 
-        plt.plot([0, 1], [0, 1], "k--")
-        plt.title(f"{model} — ROC Curves Top {top_n} Param Sets")
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.legend(loc="lower right")
-        plt.tight_layout()
-
-        filename = f"{model}_ROC_top{top_n}.png".replace(" ", "_")
-        plt.savefig(os.path.join(PLOT_DIR, filename), dpi=150, bbox_inches="tight")
-        plt.close()
-        print(f"✅ Saved: {filename}")
+    filename = os.path.join("best_ROC_all_models.png")
+    plt.savefig(os.path.join(PLOT_DIR, filename), dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"✅ Saved: {filename}")
 
 def plot_radar_top_params():
     metrics=["Accuracy", "Precision", "Recall", "F1", "AUC"]
@@ -450,20 +482,200 @@ def plot_radar_top_params():
         plt.close()
         print(f"✅ Saved: {filename}")
 
-print(select_best_dice_per_image())
-mean_dice_per_parameter_combination()
-plot_global_dice_distribution()
+def summarize_global_metrics():
+    """
+    Reads a CSV containing classification metrics and prints:
+    mean, std, min, max for Accuracy, Precision, Recall, F1, AUC
+    across ALL models, ALL parameter sets, and ALL training methods.
+    """
+
+    metrics = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
+
+    print("\n==================== GLOBAL METRIC STATISTICS ====================\n")
+
+    for m in metrics:
+        if m in df_classification.columns:
+            values = df_classification[m].dropna()
+
+            print(f"📌 {m}")
+            print(f"   Mean : {values.mean():.4f}")
+            print(f"   Std  : {values.std():.4f}")
+            print(f"   Min  : {values.min():.4f}")
+            print(f"   Max  : {values.max():.4f}")
+            print("------------------------------------------------------------------")
+
+    print("\n=========================== END SUMMARY ===========================\n")
+
+def build_best_value_table():
+    """
+    Creates a table with columns = models and rows = training methods.
+    Each cell contains ONLY the best metric value (no parameters).
+    """
+
+    models = df_classification["Model"].unique()
+    methods = df_classification["Method"].unique()
+
+    metrics = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
+    for metric in metrics:
+        print(f"\n=== Best {metric} per Model and Method ===")
+        # Header
+        header = "Method".ljust(20) + "".join(str(m).ljust(12) for m in models)
+        print(header)
+        print("-" * len(header))
+        
+        for method in methods:
+            line = method.ljust(20)
+            for model in models:
+                values = df_classification[(df_classification["Model"]==model) & (df_classification["Method"]==method)][metric]
+                best_value = values.max() if not values.empty else None
+                line += f"{best_value:.4f}".ljust(12) if best_value is not None else "—".ljust(12)
+            print(line)
+
+
+def plot_best_value_table():
+        """
+        Displays a single bar plot of best metric values for all models and methods.
+        X-axis: models
+        Bars: grouped by method, with different colors for metrics
+        """
+        models = df_classification["Model"].unique()
+        methods = df_classification["Method"].unique()
+        metrics = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
+        
+        colors = ["skyblue", "orange", "green"]  # one color per method
+        width = 0.15  # width of each bar
+        
+        x = np.arange(len(models))  # positions for models
+        
+        fig, ax = plt.subplots(figsize=(12,6))
+        
+        for i, metric in enumerate(metrics):
+            for j, method in enumerate(methods):
+                # Extract best values
+                best_values = []
+                for model in models:
+                    values = df_classification[(df_classification["Model"]==model) & 
+                                            (df_classification["Method"]==method)][metric]
+                    best_values.append(values.max() if not values.empty else np.nan)
+                
+                # Shift bars for both metric and method
+                bar_positions = x - (len(metrics)*width/2) + i*width + j*(width/len(metrics))
+                ax.bar(bar_positions, best_values, width/len(metrics), label=f"{metric} ({method})", color=colors[j % len(colors)])
+        
+        ax.set_xticks(x)
+        ax.set_xticklabels(models)
+        ax.set_ylim(0,1.05)
+        ax.set_ylabel("Metric Value")
+        ax.set_title("Best Metric Values per Model and Method")
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+
+        filename = f"best_values_accros_parameters.png".replace(" ", "_")
+        file_path = os.path.join(PLOT_DIR, filename)
+        plt.savefig(file_path, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"✅ Saved plot: {file_path}")
+
+def plot_best_params_set_by_accuracy():
+    
+    models = df_classification["Model"].unique()
+    metrics = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
+    colors = ["skyblue", "orange", "green", "red", "purple"]  # one color per metric
+    width = 0.15
+    x = np.arange(len(models))
+
+    fig, ax = plt.subplots(figsize=(14,6))
+
+    # Store best values and corresponding parameters
+    best_values = {metric: [] for metric in metrics}
+    best_params = []
+
+    # For each model, select the parameter set with max Accuracy
+    for model in models:
+        df_model = df_classification[df_classification["Model"] == model]
+        idx_best = df_model["Accuracy"].idxmax()  # best Accuracy
+        best_params.append(df_model.loc[idx_best, "Params_str"])
+        
+        # Get all metrics for that row
+        for metric in metrics:
+            best_values[metric].append(df_model.loc[idx_best, metric])
+
+    # Plot bars
+    for i, metric in enumerate(metrics):
+        ax.bar(x + i*width, best_values[metric], width, color=colors[i], label=metric)
+
+    # X-axis
+    ax.set_xticks(x + width*2)
+    ax.set_xticklabels(models)
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("Metric Value")
+    ax.set_title("Metric Values per Model (Best Accuracy Parameter Set)")
+
+    # Legend for metrics
+    ax.legend(title="Metrics", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    # Add chosen parameter sets below plot, one per line
+    param_text = "\n".join([f"{model}: {param}" for model, param in zip(models, best_params)])
+    ax.text(0, -0.25, param_text, ha='left', va='top', fontsize=10, transform=ax.transAxes)
+
+    plt.tight_layout()
+    filename = f"best_params_across_models_by_accuracy.png".replace(" ", "_")
+    file_path = os.path.join(PLOT_DIR, filename)
+    plt.savefig(file_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"✅ Saved plot: {file_path}")
+
+def plot_best_confusion_matrices():
+    """
+    For each model, find the best parameter set + training method based on Accuracy
+    and plot its confusion matrix.
+    """
+    for model in df_classification["Model"].unique():
+        df_model = df_classification[df_classification["Model"] == model]
+        # Find the row with max Accuracy
+        idx_best = df_model["Accuracy"].idxmax()
+        best_row = df_model.loc[idx_best]
+
+        # Retrieve confusion matrix
+        cm_flat = best_row["CM"]  # assumed [TN, FP, FN, TP]
+        cm = np.array(cm_flat).reshape(2, 2)
+
+        plt.figure(figsize=(10, 5))
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+                    xticklabels=["Pred 0", "Pred 1"],
+                    yticklabels=["True 0", "True 1"])
+        plt.title(f"{model} Confusion Matrix\nMethod: {best_row['Method']}\nParams: {best_row['Params_str']}", fontsize=10)
+        plt.ylabel("True label")
+        plt.xlabel("Predicted label")
+
+        # Save figure
+        filename = f"{model}_best_CM.png".replace(" ", "_")
+        file_path = os.path.join(PLOT_DIR, filename)
+        plt.tight_layout()
+        plt.savefig(file_path, dpi=150)
+        plt.close()
+        print(f"✅ Saved: {file_path} for {model}")
+
+#print(select_best_dice_per_image())
+#mean_dice_per_parameter_combination()
+#plot_global_dice_distribution()
 #print_acceptable_segmentations()
 #print_outlier_segmentations()
-print(most_frequent_best_segmentations(top_n=5))
+#print(most_frequent_best_segmentations(top_n=5))
 
 #plot_top3_params_per_model()
 #plot_confusion_matrices()
-#plot_model_metrics()
-#plot_model_param_performance_across_methods()
+plot_model_metrics()
+#plot_model_param_performance_across_methods() #-->good graphics 
 #plot_metric_distributions()
-#plot_roc_curves()
+plot_best_roc_curves()
 #plot_radar_top_params()
+#summarize_global_metrics()
+#build_best_value_table()
+#plot_best_value_table() 
+plot_best_params_set_by_accuracy()
+plot_best_confusion_matrices()
+
 
 """
 Explication of every plot
