@@ -184,18 +184,27 @@ def assign_param_codes(df):
 def plot_model_metrics():
     """
     For each model, plot all metrics in the same figure per parameter set (ParamCode),
-    using consistent colors for each metric.
+    using consistent colors for each metric. Prints one line per ParamCode actually used in the plot.
     """
     metrics_cols = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
-    colors = ["skyblue", "orange", "green", "red", "purple"]  # same as before
+    colors = ["skyblue", "orange", "green", "red", "purple"]
 
     for model in df_classification["Model"].unique():
         subset = df_classification[df_classification["Model"] == model].copy()
-        param_mapping = assign_param_codes(subset)  # maps full params to short codes
-        print(f"Generating combined plot for model: {model}")
+        param_mapping = assign_param_codes(subset)
+        print(f"\nGenerating combined plot for model: {model}")
 
-        # Melt the DataFrame for seaborn
-        plot_df = subset.melt(
+        # Aggregate by ParamCode to remove duplicates (mean metrics)
+        subset_agg = subset.groupby("ParamCode", as_index=False)[metrics_cols].mean()
+        subset_agg["Params"] = subset.groupby("ParamCode")["Params"].first().values
+
+        # Print one line per ParamCode
+        for idx, row in subset_agg.iterrows():
+            metrics_str = ", ".join([f"{metric}={row[metric]:.3f}" for metric in metrics_cols])
+            print(f"ParamCode {row['ParamCode']} ({row['Params']}): {metrics_str}")
+
+        # Melt for plotting
+        plot_df = subset_agg.melt(
             id_vars=["ParamCode"], 
             value_vars=metrics_cols,
             var_name="Metric",
@@ -214,23 +223,20 @@ def plot_model_metrics():
         plt.ylabel("Metric Value")
         plt.xlabel("Parameter Set (see below)")
 
-        # Adjust y-axis
         y_min = max(0, plot_df["Value"].min() - 0.02)
         y_max = min(1, plot_df["Value"].max() + 0.02)
         plt.ylim(y_min, y_max)
 
-        # Show parameter legend under the plot
         legend_text = "\n".join([f"{code}: {full}" for full, code in param_mapping.items()])
         plt.figtext(0.01, -0.05, legend_text, ha="left", fontsize=8, wrap=True)
 
         plt.tight_layout()
-
-        # Save figure
         filename = f"{model}_all_metrics.png".replace(" ", "_")
         file_path = os.path.join(PLOT_DIR, filename)
         plt.savefig(file_path, dpi=150, bbox_inches="tight")
         plt.close()
         print(f"✅ Saved: {file_path}")
+
 
 # Plot confusion matrices per model
 def plot_confusion_matrices():
@@ -638,6 +644,20 @@ def plot_best_confusion_matrices():
 
         # Retrieve confusion matrix
         cm_flat = best_row["CM"]  # assumed [TN, FP, FN, TP]
+
+        # ==== PRINT VALUES USED ====
+        print("\n" + "="*70)
+        print(f"📌 BEST RESULTS FOR MODEL: {model}")
+        print("="*70)
+        print(f"Method: {best_row['Method']}")
+        print(f"Params: {best_row['Params_str']}\n")
+
+        print(f"Confusion Matrix Values:")
+        print(f" TN = {cm_flat[0]}")
+        print(f" FP = {cm_flat[1]}")
+        print(f" FN = {cm_flat[2]}")
+        print(f" TP = {cm_flat[3]}\n")
+        
         cm = np.array(cm_flat).reshape(2, 2)
 
         plt.figure(figsize=(10, 5))
