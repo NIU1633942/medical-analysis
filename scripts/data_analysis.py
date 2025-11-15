@@ -5,33 +5,157 @@ import ast
 import seaborn as sns
 import numpy as np
 from sklearn import metrics
+from collections import Counter
 
 from sklearn.metrics import (
     roc_curve, auc
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-RESULTS_CSV = os.path.join(BASE_DIR, "..", "results", "results_classification.csv")
+RESULTS_CLASSIFICATION_CSV = os.path.join(BASE_DIR, "..", "results", "results_classification.csv")
+RESULTS_SEGMENTATION_CSV = os.path.join(BASE_DIR, "..", "results", "results_segmentation.csv")
 PLOT_DIR = os.path.join(BASE_DIR, "..", "results", "plots")
-df = pd.read_csv(RESULTS_CSV)
+df_classification = pd.read_csv(RESULTS_CLASSIFICATION_CSV)
+df_segmentation = pd.read_csv(RESULTS_SEGMENTATION_CSV)
 
 # Assign column names (based on your description)
-df.columns = [
+df_classification.columns = [
     "Method", "K", "Accuracy", "Precision", "Recall", "F1", "AUC",
     "CM", "Model", "Params", "Accuracy_std"
 ]
 
-df["K"] = pd.to_numeric(df["K"], errors="coerce")
-df["Accuracy"] = df["Accuracy"].astype(float)
-df["Accuracy_std"] = df["Accuracy_std"].astype(float)
-df["Precision"] = df["Precision"].astype(float)
-df["Recall"] = df["Recall"].astype(float)
-df["F1"] = df["F1"].astype(float)
-df["AUC"] = df["AUC"].astype(float)
+df_classification["K"] = pd.to_numeric(df_classification["K"], errors="coerce")
+df_classification["Accuracy"] = df_classification["Accuracy"].astype(float)
+df_classification["Accuracy_std"] = df_classification["Accuracy_std"].astype(float)
+df_classification["Precision"] = df_classification["Precision"].astype(float)
+df_classification["Recall"] = df_classification["Recall"].astype(float)
+df_classification["F1"] = df_classification["F1"].astype(float)
+df_classification["AUC"] = df_classification["AUC"].astype(float)
 
 # Convert stringified lists/dicts
-df["CM"] = df["CM"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-df["Params"] = df["Params"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+df_classification["CM"] = df_classification["CM"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+df_classification["Params"] = df_classification["Params"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+
+df_segmentation["threshold_method"] = df_segmentation["threshold_method"].astype(str)
+
+
+def select_best_dice_per_image():
+    """
+    Given a DataFrame with columns:
+        image, sigma, median_size, threshold_method, threshold_value,
+        open_size, close_size, dice
+
+    Returns a DataFrame containing ONLY the best Dice configuration
+    for each image.
+    """
+
+    # group by image and select the row with max dice
+    best_df = (
+        df_segmentation.loc[df_segmentation.groupby("image")["dice"].idxmax()]
+        .reset_index(drop=True)
+        .sort_values("image")
+    )
+
+    return best_df
+
+def plot_global_dice_distribution():
+    dice = df_segmentation["dice"]
+
+    mean, std = dice.mean(), dice.std()
+    min_val, max_val = dice.min(), dice.max()
+
+    plt.figure(figsize=(8, 5))
+    plt.hist(dice, bins=30)
+    plt.title("Global Dice Distribution")
+    plt.xlabel("Dice Coefficient")
+    plt.ylabel("Frequency")
+
+    # Text box with statistics
+    text = f"Mean = {mean:.3f}\nStd = {std:.3f}\nMin = {min_val:.3f}\nMax = {max_val:.3f}"
+    plt.gca().text(0.98, 0.95, text, transform=plt.gca().transAxes,
+                   verticalalignment="top", horizontalalignment="right",
+                   bbox=dict(facecolor="white", alpha=0.7))
+
+    filename = f"global_dice_distribution.png".replace(" ", "_")
+    file_path = os.path.join(PLOT_DIR, filename)
+    plt.savefig(file_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"✅ Saved: {file_path}")
+
+def print_acceptable_segmentations():
+    total = len(df_segmentation)
+    count_07 = (df_segmentation["dice"] > 0.7).sum()
+    percent_07 = (count_07 / total) * 100
+
+    print("\n📌 ACCEPTABLE SEGMENTATIONS (Dice > 0.7)")
+    print("-------------------------------------------------")
+    print(f"Count: {count_07} / {total}")
+    print(f"Percentage: {percent_07:.2f}%")
+    print("-------------------------------------------------\n")
+
+def print_outlier_segmentations():
+    total = len(df_segmentation)
+    outliers = df_segmentation[df_segmentation["dice"] < 0.2]
+    count_out = len(outliers)
+    percent_out = (count_out / total) * 100
+
+    print("\n⚠️ OUTLIER SEGMENTATIONS (Dice < 0.2)")
+    print("-------------------------------------------------")
+    print(f"Count: {count_out} / {total}")
+    print(f"Percentage: {percent_out:.2f}%")
+    print("\nList of outlier images:")
+    print(outliers[["image", "dice"]])
+    print("-------------------------------------------------\n")
+
+def most_frequent_best_segmentations(top_n=10):
+    """
+    Analyze which parameter combinations appear most often in the best segmentations per image.
+
+    Args:
+        df_segmentation (pd.DataFrame): DataFrame with columns ['image', 'sigma', 'median_size', 
+                                      'threshold_method', 'threshold_value', 'open_size', 'close_size', 'dice']
+        top_n (int): Number of top parameter sets to show.
+
+    Returns:
+        pd.DataFrame: Top parameter combinations with counts.
+    """
+
+    # 1. Select the best segmentation per image
+    best_per_image = df_segmentation.loc[df_segmentation.groupby("image")["dice"].idxmax()]
+
+    # 2. Create a string representation of parameter sets
+    param_cols = ["sigma", "median_size", "threshold_method", "threshold_value", "open_size", "close_size"]
+    best_per_image["param_set"] = best_per_image[param_cols].astype(str).agg("-".join, axis=1)
+
+    # 3. Count frequency of each parameter set
+    counter = Counter(best_per_image["param_set"])
+    most_common = counter.most_common(top_n)
+
+    # 4. Convert to DataFrame
+    top_df = pd.DataFrame(most_common, columns=["param_set", "count"])
+
+    return top_df
+
+
+def mean_dice_per_parameter_combination():
+    group_cols = ["sigma","median_size","threshold_method",
+                  "threshold_value","open_size","close_size"]
+
+    mean_combinations = (
+        df_segmentation.groupby(group_cols)["dice"]
+        .mean().reset_index()
+    )
+
+    plt.figure(figsize=(10,6))
+    sns.histplot(mean_combinations["dice"], bins=30, kde=True)
+    plt.title("Distribution of Mean Dice Across Parameter Combinations")
+    plt.xlabel("Mean Dice")
+
+    filename = f"mean_dice_distribution.png".replace(" ", "_")
+    file_path = os.path.join(PLOT_DIR, filename)
+    plt.savefig(file_path, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"✅ Saved: {file_path}")
 
 def shorten_params(params_dict):
     """Convert parameter dict to compact string like 'C=5|kernel=linear'."""
@@ -39,7 +163,7 @@ def shorten_params(params_dict):
         return str(params_dict)
     return "|".join([f"{k}={v}" for k, v in params_dict.items()])
 
-df["Params_str"] = df["Params"].apply(shorten_params)
+df_classification["Params_str"] = df_classification["Params"].apply(shorten_params)
 
 
 def assign_param_codes(df):
@@ -52,8 +176,8 @@ def assign_param_codes(df):
 def plot_model_metrics():
     metrics_cols = ["Accuracy", "Precision", "Recall", "F1", "AUC"]
 
-    for model in df["Model"].unique():
-        subset = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        subset = df_classification[df_classification["Model"] == model].copy()
         param_mapping = assign_param_codes(subset)
         print(f"Generando gráficos para modelo: {model}")
 
@@ -88,8 +212,8 @@ def plot_model_metrics():
 # Plot confusion matrices per model
 def plot_confusion_matrices():
     sns.set_theme(style="whitegrid", font_scale=1.1)
-    for model in df["Model"].unique():
-        subset = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        subset = df_classification[df_classification["Model"] == model].copy()
         param_mapping = assign_param_codes(subset)
 
         for _, row in subset.iterrows():
@@ -119,8 +243,8 @@ def plot_top3_params_per_model():
 
     sns.set_theme(style="whitegrid", font_scale=1.1)
 
-    for model in df["Model"].unique():
-        df_model = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        df_model = df_classification[df_classification["Model"] == model].copy()
         param_mapping = assign_param_codes(df_model)
         print(f"\nGenerating plots for model: {model}")
 
@@ -181,7 +305,7 @@ def plot_model_param_performance_across_methods():
 
     # Pick best (max) value per Model, Params_str, and Method (since K can vary)
     best_df = (
-        df.sort_values(by=["Model", "Params_str", "Method", "K"])
+        df_classification.sort_values(by=["Model", "Params_str", "Method", "K"])
           .groupby(["Model", "Params_str", "Method"], as_index=False)
           .agg({
               "K": "max",
@@ -237,8 +361,8 @@ def plot_metric_distributions():
     metrics=["Accuracy", "Precision", "Recall", "F1", "AUC"]
 
     sns.set_theme(style="whitegrid", font_scale=1.1)
-    for model in df["Model"].unique():
-        subset = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        subset = df_classification[df_classification["Model"] == model].copy()
         print(f"\n📊 Plotting distributions for model: {model}")
 
         param_mapping = assign_param_codes(subset)
@@ -263,8 +387,8 @@ def plot_metric_distributions():
 
 def plot_roc_curves(top_n=3):
     sns.set_theme(style="whitegrid", font_scale=1.0)
-    for model in df["Model"].unique():
-        subset = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        subset = df_classification[df_classification["Model"] == model].copy()
 
         # Select top N parameter sets by Accuracy
         top_params = subset.nlargest(top_n, "Accuracy")
@@ -295,8 +419,8 @@ def plot_roc_curves(top_n=3):
 
 def plot_radar_top_params():
     metrics=["Accuracy", "Precision", "Recall", "F1", "AUC"]
-    for model in df["Model"].unique():
-        subset = df[df["Model"] == model].copy()
+    for model in df_classification["Model"].unique():
+        subset = df_classification[df_classification["Model"] == model].copy()
         param_mapping = assign_param_codes(subset)
         # Choose top param by Accuracy
         top_row = subset.nlargest(1, "Accuracy").iloc[0]
@@ -326,14 +450,20 @@ def plot_radar_top_params():
         plt.close()
         print(f"✅ Saved: {filename}")
 
+print(select_best_dice_per_image())
+mean_dice_per_parameter_combination()
+plot_global_dice_distribution()
+#print_acceptable_segmentations()
+#print_outlier_segmentations()
+print(most_frequent_best_segmentations(top_n=5))
 
-plot_top3_params_per_model()
-plot_confusion_matrices()
-plot_model_metrics()
-plot_model_param_performance_across_methods()
-plot_metric_distributions()
-plot_roc_curves()
-plot_radar_top_params()
+#plot_top3_params_per_model()
+#plot_confusion_matrices()
+#plot_model_metrics()
+#plot_model_param_performance_across_methods()
+#plot_metric_distributions()
+#plot_roc_curves()
+#plot_radar_top_params()
 
 """
 Explication of every plot
